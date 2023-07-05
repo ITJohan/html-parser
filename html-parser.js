@@ -1,16 +1,14 @@
 // @ts-check
 
-/** @type {Map<string, string>} */
-const attributeMap = new Map();
-/** @type {Map<string, string>} */
-const textMap = new Map();
-/** @type {Map<string, function>} */
-const callbackMap = new Map();
-
-let id = 0;
-
 /** @type {(strings: TemplateStringsArray, ...values: (string | function)[]) => Node} */
 export const html = (strings, ...variables) => {
+  /** @type {Map<string, string>} */
+  const attributeMap = new Map();
+  /** @type {Map<string, string>} */
+  const textMap = new Map();
+  /** @type {Map<string, function>} */
+  const callbackMap = new Map();
+
   const placeholderString = strings.reduce(
     (placeholderString, string, index) => {
       const trimmedString = string.trim();
@@ -18,35 +16,32 @@ export const html = (strings, ...variables) => {
 
       if (typeof variable === 'string' && trimmedString.at(-1) === '=') {
         const attribute = trimmedString.split(' ').at(-1)?.slice(0, -1);
-        const placeholderId = `${attribute}-${id}`;
+        const placeholderId = `${attribute}-${index}`;
         const partialPlaceholderString = trimmedString.replace(
           `${attribute}=`,
           placeholderId
         );
         attributeMap.set(placeholderId, variable);
-        id++;
 
         return placeholderString + partialPlaceholderString;
       }
 
       if (typeof variable === 'string' && trimmedString.at(-1) === '>') {
-        const placeholderId = `text-${id}`;
+        const placeholderId = `text-${index}`;
         const partialPlaceholderString = trimmedString + placeholderId;
         textMap.set(placeholderId, variable);
-        id++;
 
         return placeholderString + partialPlaceholderString;
       }
 
       if (typeof variable === 'function' && trimmedString.at(-1) === '=') {
         const eventType = trimmedString.split('@')[1].split('=')[0];
-        const placeholderId = `${eventType}-${id}`;
+        const placeholderId = `${eventType}-${index}`;
         const partialPlaceholderString = trimmedString.replace(
           `@${eventType}=`,
           placeholderId
         );
         callbackMap.set(placeholderId, variable);
-        id++;
 
         return placeholderString + partialPlaceholderString;
       }
