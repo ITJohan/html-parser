@@ -1,6 +1,8 @@
 // @ts-check
 
 /** @type {Map<string, string>} */
+const attributeMap = new Map();
+/** @type {Map<string, string>} */
 const textMap = new Map();
 /** @type {Map<string, function>} */
 const callbackMap = new Map();
@@ -11,21 +13,35 @@ let id = 0;
 export const html = (strings, ...variables) => {
   const placeholderString = strings.reduce(
     (placeholderString, string, index) => {
+      const trimmedString = string.trim();
       const variable = variables[index];
 
-      if (typeof variable === 'string') {
+      if (typeof variable === 'string' && trimmedString.at(-1) === '=') {
+        const attribute = trimmedString.split(' ').at(-1)?.slice(0, -1);
+        const placeholderId = `${attribute}-${id}`;
+        const partialPlaceholderString = trimmedString.replace(
+          `${attribute}=`,
+          placeholderId
+        );
+        attributeMap.set(placeholderId, variable);
+        id++;
+
+        return placeholderString + partialPlaceholderString;
+      }
+
+      if (typeof variable === 'string' && trimmedString.at(-1) === '>') {
         const placeholderId = `text-${id}`;
-        const partialPlaceholderString = string + placeholderId;
+        const partialPlaceholderString = trimmedString + placeholderId;
         textMap.set(placeholderId, variable);
         id++;
 
         return placeholderString + partialPlaceholderString;
       }
 
-      if (typeof variable === 'function') {
-        const eventType = string.split('@')[1].split('=')[0];
+      if (typeof variable === 'function' && trimmedString.at(-1) === '=') {
+        const eventType = trimmedString.split('@')[1].split('=')[0];
         const placeholderId = `${eventType}-${id}`;
-        const partialPlaceholderString = string.replace(
+        const partialPlaceholderString = trimmedString.replace(
           `@${eventType}=`,
           placeholderId
         );
@@ -35,7 +51,7 @@ export const html = (strings, ...variables) => {
         return placeholderString + partialPlaceholderString;
       }
 
-      return placeholderString + string;
+      return placeholderString + trimmedString;
     },
     ''
   );
@@ -49,13 +65,22 @@ export const html = (strings, ...variables) => {
   });
 
   const templateClone = template.content.cloneNode(true);
-  replacePlaceholders(templateClone, textMap, callbackMap);
+  replacePlaceholders(templateClone, attributeMap, textMap, callbackMap);
 
   return templateClone;
 };
 
-/** @type {(node: Node, textMap: Map<string, string>, callbackMap: Map<string, function>) => void} */
-const replacePlaceholders = (node, textMap, callbackMap) => {
+/** @type {(node: Node, attributeMap: Map<string, string>, textMap: Map<string, string>, callbackMap: Map<string, function>) => void} */
+const replacePlaceholders = (node, attributeMap, textMap, callbackMap) => {
+  attributeMap.forEach((attributeValue, placeholderId) => {
+    const [attributeType] = placeholderId.split('-');
+    const attributeNode = findAttributeNode(node, placeholderId);
+
+    if (attributeNode) {
+      attributeNode.setAttribute(attributeType, attributeValue);
+    }
+  });
+
   textMap.forEach((text, placeholderId) => {
     const textNode = findTextNode(node, placeholderId);
 
@@ -74,6 +99,25 @@ const replacePlaceholders = (node, textMap, callbackMap) => {
       callbackNode.removeAttribute(placeholderId);
     }
   });
+};
+
+/** @type {(node: Node, placeholderId: string) => HTMLElement | undefined} */
+const findAttributeNode = (node, placeholderId) => {
+  if (node instanceof HTMLElement && node.hasAttribute(placeholderId)) {
+    return node;
+  }
+
+  if (node.hasChildNodes()) {
+    for (const childNode of node.childNodes) {
+      const result = findAttributeNode(childNode, placeholderId);
+
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  return undefined;
 };
 
 /** @type {(node: Node, placeholderId: string) => Node | undefined} */

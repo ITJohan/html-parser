@@ -6,6 +6,7 @@ class TestComponent extends HTMLElement {
   shadowRoot = this.attachShadow({ mode: 'open' });
   text = 'Hello world!';
   label = 'Click me';
+  id = 'testid';
 
   constructor() {
     super();
@@ -13,7 +14,7 @@ class TestComponent extends HTMLElement {
       html`
         <main>
           ${this.text}
-          <section>
+          <section id=${this.id}>
             <p>Hello</p>
             <button @click=${() => console.log('testing')}>
               ${this.label}
