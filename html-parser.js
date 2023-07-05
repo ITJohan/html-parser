@@ -73,6 +73,7 @@ const replacePlaceholders = (node, attributeMap, textMap, callbackMap) => {
 
     if (attributeNode) {
       attributeNode.setAttribute(attributeType, attributeValue);
+      attributeNode.removeAttribute(placeholderId);
     }
   });
 
