@@ -1,6 +1,10 @@
 // @ts-check
 
-/** @type {(strings: TemplateStringsArray, ...values: (string | function)[]) => Node} */
+/**
+ * @param {TemplateStringsArray} strings
+ * @param {(string | function | Node[])[]} variables
+ * @returns {Node}
+ */
 export const html = (strings, ...variables) => {
   /** @type {Map<string, string>} */
   const attributeMap = new Map();
@@ -8,6 +12,8 @@ export const html = (strings, ...variables) => {
   const textMap = new Map();
   /** @type {Map<string, function>} */
   const callbackMap = new Map();
+  /** @type {Map<string, Node[]>} */
+  const arrayMap = new Map();
 
   const placeholderString = strings.reduce(
     (placeholderString, string, index) => {
@@ -46,6 +52,14 @@ export const html = (strings, ...variables) => {
         return placeholderString + partialPlaceholderString;
       }
 
+      if (variable instanceof Array && trimmedString.at(-1) === '>') {
+        const placeholderId = `array-${index}`;
+        const partialPlaceholderString = trimmedString + placeholderId;
+        arrayMap.set(placeholderId, variable);
+
+        return placeholderString + partialPlaceholderString;
+      }
+
       return placeholderString + trimmedString;
     },
     ''
@@ -60,16 +74,34 @@ export const html = (strings, ...variables) => {
   });
 
   const templateClone = template.content.cloneNode(true);
-  replacePlaceholders(templateClone, attributeMap, textMap, callbackMap);
+  replacePlaceholders(
+    templateClone,
+    attributeMap,
+    textMap,
+    callbackMap,
+    arrayMap
+  );
 
   return templateClone;
 };
 
-/** @type {(node: Node, attributeMap: Map<string, string>, textMap: Map<string, string>, callbackMap: Map<string, function>) => void} */
-const replacePlaceholders = (node, attributeMap, textMap, callbackMap) => {
+/**
+ * @param {Node} node
+ * @param {Map<string, string>} attributeMap
+ * @param {Map<string, string>} textMap
+ * @param {Map<string, function>} callbackMap
+ * @param {Map<string, Node[]>} arrayMap
+ */
+const replacePlaceholders = (
+  node,
+  attributeMap,
+  textMap,
+  callbackMap,
+  arrayMap
+) => {
   attributeMap.forEach((attributeValue, placeholderId) => {
     const [attributeType] = placeholderId.split('-');
-    const attributeNode = findAttributeNode(node, placeholderId);
+    const attributeNode = findInlineNode(node, placeholderId);
 
     if (attributeNode) {
       attributeNode.setAttribute(attributeType, attributeValue);
@@ -78,7 +110,7 @@ const replacePlaceholders = (node, attributeMap, textMap, callbackMap) => {
   });
 
   textMap.forEach((text, placeholderId) => {
-    const textNode = findTextNode(node, placeholderId);
+    const textNode = findNestedNode(node, placeholderId);
 
     if (textNode) {
       textNode.textContent = text;
@@ -87,7 +119,7 @@ const replacePlaceholders = (node, attributeMap, textMap, callbackMap) => {
 
   callbackMap.forEach((callback, placeholderId) => {
     const [eventType] = placeholderId.split('-');
-    const callbackNode = findCallbackNode(node, placeholderId);
+    const callbackNode = findInlineNode(node, placeholderId);
 
     if (callbackNode) {
       // @ts-ignore
@@ -95,17 +127,29 @@ const replacePlaceholders = (node, attributeMap, textMap, callbackMap) => {
       callbackNode.removeAttribute(placeholderId);
     }
   });
+
+  arrayMap.forEach((array, placeholderId) => {
+    const textNode = findNestedNode(node, placeholderId);
+
+    if (textNode && textNode.parentElement) {
+      textNode.parentElement?.replaceChildren(...array);
+    }
+  });
 };
 
-/** @type {(node: Node, placeholderId: string) => HTMLElement | undefined} */
-const findAttributeNode = (node, placeholderId) => {
-  if (node instanceof HTMLElement && node.hasAttribute(placeholderId)) {
+/**
+ * @param {Node} node
+ * @param {string} placeholderId
+ * @returns {Node | undefined}
+ */
+const findNestedNode = (node, placeholderId) => {
+  if (node instanceof Text && node.textContent === placeholderId) {
     return node;
   }
 
   if (node.hasChildNodes()) {
     for (const childNode of node.childNodes) {
-      const result = findAttributeNode(childNode, placeholderId);
+      const result = findNestedNode(childNode, placeholderId);
 
       if (result) {
         return result;
@@ -116,34 +160,19 @@ const findAttributeNode = (node, placeholderId) => {
   return undefined;
 };
 
-/** @type {(node: Node, placeholderId: string) => Node | undefined} */
-const findTextNode = (node, placeholderId) => {
-  if (node.textContent?.trim() === placeholderId) {
-    return node;
-  }
-
-  if (node.hasChildNodes()) {
-    for (const childNode of node.childNodes) {
-      const result = findTextNode(childNode, placeholderId);
-
-      if (result) {
-        return result;
-      }
-    }
-  }
-
-  return undefined;
-};
-
-/** @type {(node: Node, placeholderId: string) => HTMLElement | undefined} */
-const findCallbackNode = (node, placeholderId) => {
+/**
+ * @param {Node} node
+ * @param {string} placeholderId
+ * @returns {HTMLElement | undefined}
+ */
+const findInlineNode = (node, placeholderId) => {
   if (node instanceof HTMLElement && node.hasAttribute(placeholderId)) {
     return node;
   }
 
   if (node.hasChildNodes()) {
     for (const childNode of node.childNodes) {
-      const result = findCallbackNode(childNode, placeholderId);
+      const result = findInlineNode(childNode, placeholderId);
 
       if (result) {
         return result;
