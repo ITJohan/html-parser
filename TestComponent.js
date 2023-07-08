@@ -34,7 +34,9 @@ class TestComponent extends HTMLElement {
           <p>Hello</p>
           <button @click=${() => console.log('testing')}>${this.label}</button>
           <ul>
-            ${[1, 2, 3].map((number) => html`<li>${String(number)}</li>`)}
+            ${[1, 2, 3].map(
+              (number) => html`<li test=${number}>${number}</li>`
+            )}
           </ul>
         </section>
         <footer>This is the footer</footer>

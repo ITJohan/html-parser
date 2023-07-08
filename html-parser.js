@@ -2,7 +2,7 @@
 
 /**
  * @param {TemplateStringsArray} strings
- * @param {(string | function | Node[])[]} variables
+ * @param {(string | number | function | Node[])[]} variables
  * @returns {Node}
  */
 export const html = (strings, ...variables) => {
@@ -20,22 +20,28 @@ export const html = (strings, ...variables) => {
       const trimmedString = string.trim();
       const variable = variables[index];
 
-      if (typeof variable === 'string' && trimmedString.at(-1) === '=') {
+      if (
+        (typeof variable === 'string' || typeof variable === 'number') &&
+        trimmedString.at(-1) === '='
+      ) {
         const attribute = trimmedString.split(' ').at(-1)?.slice(0, -1);
         const placeholderId = `${attribute}-${index}`;
         const partialPlaceholderString = trimmedString.replace(
           `${attribute}=`,
           placeholderId
         );
-        attributeMap.set(placeholderId, variable);
+        attributeMap.set(placeholderId, String(variable));
 
         return placeholderString + partialPlaceholderString;
       }
 
-      if (typeof variable === 'string' && trimmedString.at(-1) === '>') {
+      if (
+        (typeof variable === 'string' || typeof variable === 'number') &&
+        trimmedString.at(-1) === '>'
+      ) {
         const placeholderId = `text-${index}`;
         const partialPlaceholderString = trimmedString + placeholderId;
-        textMap.set(placeholderId, variable);
+        textMap.set(placeholderId, String(variable));
 
         return placeholderString + partialPlaceholderString;
       }
